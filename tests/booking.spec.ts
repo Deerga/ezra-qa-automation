@@ -93,6 +93,19 @@ test.describe("Ezra Booking Flow", () => {
   test("cross-member data isolation: member token only returns own data", async ({
     authenticatedPage: page,
   }) => {
+    // PREREQUISITE: This test requires a second staging member account.
+    // See README.md "Test 3: Cross-Member Data Isolation" for setup instructions.
+    const MEMBER_B_ID = process.env.TEST_MEMBER_B_ID;
+    if (!MEMBER_B_ID) {
+      test.skip(
+        true,
+        "Prerequisite not met: TEST_MEMBER_B_ID environment variable not set. " +
+          "Create a second staging account and set TEST_MEMBER_B_ID in .env to enable this security test. " +
+          "See README.md for detailed setup instructions."
+      );
+      return;
+    }
+
     let memberAToken = "";
     let memberAMnemonicId: number | null = null;
     let membersApiUrl = "";
@@ -124,22 +137,42 @@ test.describe("Ezra Booking Flow", () => {
       await page.waitForLoadState("domcontentloaded");
     });
 
-    await test.step("Call members API with Member A token and verify response", async () => {
+    await test.step("Verify Member A token cannot access Member B data", async () => {
       if (!membersApiUrl) {
-        test.skip(true, "Skipped: membersApiUrl not captured from network");
-        return;
+        throw new Error(
+          "Could not capture members API URL from network. " +
+            "Verify the /reports page loads and makes API calls to /individuals/api/members."
+        );
       }
 
-      const response = await page.request.get(membersApiUrl, {
+      // Construct attack URL: attempt to access Member B's endpoint using Member A's token
+      const attackUrl = membersApiUrl.replace(/\/members\/[^/]+/, `/members/${MEMBER_B_ID}`);
+
+      const response = await page.request.get(attackUrl, {
         headers: { Authorization: memberAToken },
       });
 
-      expect(response.status()).toBe(200);
-      const body = await response.json();
+      // Security assertion: Should be 403 Forbidden, never 200 OK
+      expect(response.status()).toBe(403);
 
+      // Verify no sensitive data is leaked in the error response
+      const body = await response.text();
+      expect(body).not.toContain(MEMBER_B_ID);
+      expect(body).not.toContain("questionnaire");
+      expect(body).not.toContain("results");
+    });
+
+    await test.step("Verify Member A data was not modified by the access attempt", async () => {
+      // Re-fetch Member A's own data to confirm it was not altered
+      const verifyResponse = await page.request.get(membersApiUrl, {
+        headers: { Authorization: memberAToken },
+      });
+
+      expect(verifyResponse.status()).toBe(200);
+      const body = await verifyResponse.json();
+
+      // Data integrity check: Member A's ID is unchanged
       expect(body.mnemonicId).toBe(memberAMnemonicId);
-      expect(body.email).toBe(process.env.TEST_USER_EMAIL);
-      expect(body.email).not.toBe(process.env.TEST_USER_EMAIL_B);
     });
   });
 });

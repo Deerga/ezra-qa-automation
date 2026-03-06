@@ -94,7 +94,9 @@ Test cases are ordered from most to least critical based on business impact, dat
 - Invoice shows original price, discount applied, and final amount charged
 - Applying the same promo code a second time is rejected
 
-**Note:** A valid test promo code should be created in staging as part of test data setup. The promo field is present in the live UI and must be covered.
+**Prerequisite:** A valid test promo code (e.g., `PROMO_TESTCODE`) must be configured in staging with a known discount amount (e.g., $100 off) before this test runs. This value should be documented in test data setup.
+
+**Note:** The promo field is present in the live UI and must be covered to ensure discount logic doesn't regress.
 
 ---
 
@@ -176,6 +178,7 @@ Test cases are ordered from most to least critical based on business impact, dat
 **Priority:** High
 **Type:** Negative / Input Validation
 **URL:** `/book-scan/reserve-appointment`
+**Test Data:** Invalid promo code `INVALIDXYZ`
 
 **Steps:**
 1. Complete Steps 1 and 2
@@ -212,6 +215,7 @@ Test cases are ordered from most to least critical based on business impact, dat
 **Priority:** Medium
 **Type:** Input Validation / Negative
 **URL:** `/book-scan/reserve-appointment`
+**Test Data:** Various invalid card formats (too short, expired, invalid CVC)
 
 **Steps:**
 1. Click Continue with all card fields empty
@@ -230,6 +234,7 @@ Test cases are ordered from most to least critical based on business impact, dat
 ### TC-12 · Unauthenticated user is redirected to login when accessing booking URLs directly
 **Priority:** Medium
 **Type:** Authentication / Access Control
+**URL:** `/book-scan/select-plan`, `/book-scan/schedule-scan`, `/book-scan/reserve-appointment`
 
 **Steps:**
 1. Log out of the portal
@@ -247,6 +252,7 @@ Test cases are ordered from most to least critical based on business impact, dat
 **Priority:** Medium
 **Type:** UI Accuracy / Business Logic
 **URL:** `/book-scan/select-plan`
+**Test Data:** Scan type price variations: MRI ($999), MRI + Spine ($1,699), MRI + Skeletal ($3,999), Heart CT ($349)
 
 **Steps:**
 1. Note the Affirm estimate displayed under MRI Scan ($999 → "as low as $63/month")
@@ -280,7 +286,8 @@ Test cases are ordered from most to least critical based on business impact, dat
 ### TC-15 · Page transition loader resolves completely before interactive elements are accessible
 **Priority:** Low
 **Type:** Performance / UX
-**URL:** All three booking steps
+**URL:** All three booking steps (`/book-scan/select-plan`, `/book-scan/schedule-scan`, `/book-scan/reserve-appointment`)
+**Test Data:** Standard booking flow selections (MRI Scan, AMRIC location, Mar 19 · 12:00 PM)
 
 **Steps:**
 1. Navigate between each of the three booking steps

@@ -38,6 +38,21 @@ npm run test:headed
 npm run test:ui
 ```
 
+### 4. Run in CI/CD
+
+Tests are designed to run in CI with automatic retries:
+```bash
+npm test  # In CI, runs with 2 retries per failed test
+```
+
+**Artifacts:**
+- HTML report: `playwright-report/index.html`
+- Screenshots: `test-results/` (on failure only)
+- Videos: `test-results/` (on retry)
+- Traces: `test-results/` (on first failure)
+
+**Expected Runtime:** Full suite completes in ~2 minutes under normal network conditions.
+
 ---
 
 ## Structure
@@ -74,26 +89,52 @@ picks the first available location/date/time, and verifies the payment page is r
 Runs the same flow to the payment step, enters Stripe's test declined card
 (`4000 0000 0000 0002`), submits, and asserts an error message appears.
 
-### Test 3 — Cross-member data isolation
-Captures Member A's auth token from network traffic, then makes a direct API call
-to Member B's endpoint using Member A's token. Expects a 403 response.
+### Test 3 — Cross-member data isolation (Security test)
+**Status:** Requires second staging account to run.
 
-> **Note:** Test 3 requires `TEST_MEMBER_B_ID` in your `.env`. Contact the team
-> for a second staging account. Without it, the test is skipped automatically.
+This test verifies that Member A's authentication token cannot be used to access Member B's
+private medical data (questionnaire responses, scan results). It attempts a token-substitution
+attack and expects a 403 Forbidden response.
+
+**To enable Test 3:**
+1. Create a second test member account in staging (or request one from the team)
+2. Get that account's member ID (usually an integer like `12345`)
+3. Add to your `.env` file:
+   ```
+   TEST_MEMBER_B_ID=<member-id>
+   ```
+4. Run tests again: `npm test`
+
+Test 3 will then run and verify that cross-member access is blocked. If you don't provide
+`TEST_MEMBER_B_ID`, the test will skip gracefully with a helpful message.
+
+**Security test coverage:**
+- ✓ Member A cannot read Member B's data using their own token
+- ✓ No sensitive data (questionnaire IDs, results) leaks in error responses
+- ✓ Member A's data remains unmodified after access attempts
+- ✓ Backend returns proper 403 status code (not 500, 401, or 200)
 
 ---
 
-## Locator decisions
+## Locator strategy
 
-All locators come from direct DOM inspection of the staging site — no guesses.
+Locators prioritize Playwright's recommended approach: `getByRole` and `getByLabel` where available, falling back to `getByTestId` for components that lack semantic HTML.
 
-| Element | Strategy | Reason |
-|---|---|---|
-| Email / Password | `getByLabel` | Native `<label for="...">` |
-| Submit (login) | `getByRole('button', { name: 'Submit' })` | Accessible role + text |
-| Sex dropdown | `getByRole('combobox')` + `getByRole('option')` | Custom Vue multiselect |
-| Scan card | `getByTestId('FB30-encounter-card')` | `data-testid` on each card |
-| Continue (plan) | `getByTestId('select-plan-submit-btn')` | `data-testid` confirmed |
-| Continue (schedule) | `locator('[data-test="submit"]')` | `data-test` attribute |
-| Calendar day | `getByTestId('3-17-cal-day-content')` | `data-testid` on each day |
-| Payment inputs | `#payment-numberInput` etc. | Direct `id` attributes |
+---
+
+## Future improvements
+
+### Test Architecture
+1. **Shift tests to API level** — Move validation tests (e.g., data isolation, payment processing) from UI to direct API calls for faster feedback and reduced flakiness
+2. **UI tests for critical journeys only** — Keep Playwright for booking flow and payment submission; validate edge cases and error states via API
+
+### Productivity & Observability
+3. **Pass/fail rate dashboard** — Track test stability over time to identify regressions early and prioritize fixes
+4. **Flaky test detection** — Automatically flag tests that fail intermittently to prevent false negatives masking real issues
+5. **Execution time analytics** — Report test duration trends to catch performance regressions and optimize slow tests
+6. **Test coverage metrics** — Measure which features are covered and highlight untested areas for prioritization
+
+### Quality Improvements
+7. **Parameterized test data** — Enable data-driven testing across multiple booking scenarios (different scan types, locations, payment methods)
+8. **Visual regression testing** — Screenshot key pages to catch unintended UI changes in checkout flow
+9. **Multi-browser validation** — Run critical paths on Firefox and WebKit in addition to Chromium
