@@ -20,23 +20,9 @@ export const test = base.extend<AuthFixtures>({
 
     // Fail fast — confirm login succeeded before running any test
     await expect(page).not.toHaveURL(/sign-in/, { timeout: 10000 });
-    await cancelInProgressBookingIfPresent(page);
 
     await use(page);
   },
 });
-
-async function cancelInProgressBookingIfPresent(page: Page): Promise<void> {
-  try {
-    // If we're stuck mid-booking flow, navigate away cleanly
-    const currentUrl = page.url();
-    if (currentUrl.includes('/book-scan')) {
-      const cancelButton = page.getByRole('button', { name: 'Cancel' });
-      await cancelButton.waitFor({ state: 'visible', timeout: 3000 });
-      await cancelButton.click();
-      await page.waitForLoadState('domcontentloaded');
-    }
-  } catch { /* not in booking flow */ }
-}
 
 export { expect } from '@playwright/test';
